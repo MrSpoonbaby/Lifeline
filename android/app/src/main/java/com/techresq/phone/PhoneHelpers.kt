@@ -1,0 +1,66 @@
+package com.techresq.phone
+
+import android.content.Context
+import android.util.Base64
+import com.facebook.react.ReactPackage
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.NativeModule
+import com.facebook.react.bridge.Promise
+import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.uimanager.ViewManager
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
+import java.security.MessageDigest
+import java.security.SecureRandom
+
+/** The few native bits the JS side needs: saved settings, the PKCE pair for sign-in, and this phone's Firebase token. */
+class PhoneHelpersModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
+  // App-private storage; Android keeps other apps out of it.
+  private val prefs = context.getSharedPreferences("techresq_phone", Context.MODE_PRIVATE)
+
+  override fun getName(): String = "PhoneHelpers"
+
+  @ReactMethod
+  fun get(key: String, promise: Promise) {
+    promise.resolve(prefs.getString(key, null))
+  }
+
+  @ReactMethod
+  fun set(key: String, value: String?, promise: Promise) {
+    prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+    promise.resolve(null)
+  }
+
+  @ReactMethod
+  fun pkce(promise: Promise) {
+    val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
+    val verifier = Base64.encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) }, flags)
+    val challenge = Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()), flags)
+    promise.resolve(Arguments.createMap().apply {
+      putString("verifier", verifier)
+      putString("challenge", challenge)
+    })
+  }
+
+  @ReactMethod
+  fun pushToken(promise: Promise) {
+    if (FirebaseApp.getApps(reactApplicationContext).isEmpty()) {
+      promise.resolve(null) // built without google-services.json: no text alerts
+      return
+    }
+    FirebaseMessaging.getInstance().token
+      .addOnSuccessListener { promise.resolve(it) }
+      .addOnFailureListener { promise.resolve(null) }
+  }
+}
+
+class PhoneHelpersPackage : ReactPackage {
+  @Deprecated("Legacy module registration; fine through the new architecture's interop layer")
+  override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
+    listOf(PhoneHelpersModule(reactContext))
+
+  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<in Nothing, in Nothing>> =
+    emptyList()
+}
