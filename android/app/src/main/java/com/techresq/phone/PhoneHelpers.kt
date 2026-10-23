@@ -1,9 +1,7 @@
 package com.techresq.phone
 
 import android.content.Context
-import android.util.Base64
 import com.facebook.react.ReactPackage
-import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -12,10 +10,11 @@ import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.uimanager.ViewManager
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
-import java.security.MessageDigest
-import java.security.SecureRandom
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 
-/** The few native bits the JS side needs: saved settings, the PKCE pair for sign-in, and this phone's Firebase token. */
+/** The few native bits the JS side needs: saved settings, the sign-in QR scanner, and this phone's Firebase token. */
 class PhoneHelpersModule(context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
   // App-private storage; Android keeps other apps out of it.
   private val prefs = context.getSharedPreferences("techresq_phone", Context.MODE_PRIVATE)
@@ -33,15 +32,14 @@ class PhoneHelpersModule(context: ReactApplicationContext) : ReactContextBaseJav
     promise.resolve(null)
   }
 
+  /** Google Play services' own scanner screen: no camera permission or scanner UI of ours. Resolves null if cancelled. */
   @ReactMethod
-  fun pkce(promise: Promise) {
-    val flags = Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
-    val verifier = Base64.encodeToString(ByteArray(32).also { SecureRandom().nextBytes(it) }, flags)
-    val challenge = Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()), flags)
-    promise.resolve(Arguments.createMap().apply {
-      putString("verifier", verifier)
-      putString("challenge", challenge)
-    })
+  fun scanQr(promise: Promise) {
+    val options = GmsBarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build()
+    GmsBarcodeScanning.getClient(reactApplicationContext.currentActivity ?: reactApplicationContext, options).startScan()
+      .addOnSuccessListener { promise.resolve(it.rawValue) }
+      .addOnCanceledListener { promise.resolve(null) }
+      .addOnFailureListener { promise.reject("scan_failed", it.message ?: "The scanner didn't open", it) }
   }
 
   @ReactMethod

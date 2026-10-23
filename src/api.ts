@@ -1,10 +1,10 @@
 /** Talking to the shop system (the POS Takeover site's /phone/api/). */
-import { Linking, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
 
 type Helpers = {
   get(key: string): Promise<string | null>;
   set(key: string, value: string | null): Promise<void>;
-  pkce(): Promise<{ verifier: string; challenge: string }>;
+  scanQr(): Promise<string | null>;
   pushToken(): Promise<string | null>;
 };
 export const helpers: Helpers = NativeModules.PhoneHelpers;
@@ -54,37 +54,30 @@ export async function api<T>(path: string, body?: object): Promise<T> {
   return data as T;
 }
 
-/** Sign-in step 1: open the shop site's own Google sign-in in Chrome. It comes back through techresq-phone://signin. */
-export async function startSignIn(address: string) {
-  site = address.trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//.test(site)) {
-    site = `https://${site}`;
+/** Sign in from the QR code on the shop system's Settings > Phone app: techresq-phone://signin?site=...&code=...
+ *  The code works once, so the app swaps it for a token of its own. */
+export async function signIn(link: string) {
+  const param = (name: string) => {
+    const v = new RegExp(`[?&]${name}=([^&#]+)`).exec(link)?.[1];
+    return v ? decodeURIComponent(v.replace(/\+/g, ' ')) : '';
+  };
+  const address = param('site');
+  const code = param('code');
+  if (!link.startsWith('techresq-phone://signin') || !/^https?:\/\//.test(address) || !code) {
+    throw new Error("That isn't a Tech ResQ Phone sign-in code. Use the one on Settings > Phone app in the shop system.");
   }
-  const { verifier, challenge } = await helpers.pkce();
-  await helpers.set('site', site);
-  await helpers.set('verifier', verifier); // kept in case Android closes the app while Chrome is open
-  await Linking.openURL(`${site}/phone/connect/?challenge=${challenge}`);
-}
-
-/** Sign-in step 2: swap the one-time code from the link for this phone's own token. */
-export async function finishSignIn(url: string) {
-  const code = /[?&]code=([\w-]+)/.exec(url)?.[1];
-  site = (await helpers.get('site')) ?? '';
-  const verifier = await helpers.get('verifier');
-  if (!code || !verifier || !site) {
-    throw new Error('That sign-in link is incomplete. Try again.');
-  }
-  const r = await fetch(`${site}/phone/api/signin/`, {
+  const r = await fetch(`${address}/phone/api/signin/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, verifier }),
+    body: JSON.stringify({ code }),
   });
   const data = await r.json().catch(() => ({}));
-  await helpers.set('verifier', null);
   if (!r.ok || !data.token) {
-    throw new Error(data.error || 'Sign-in failed. Try again.');
+    throw new Error(data.error || "Sign-in didn't work. Show a new QR code and try again.");
   }
+  site = address;
   token = data.token;
+  await helpers.set('site', site);
   await helpers.set('token', token);
 }
 

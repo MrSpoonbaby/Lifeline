@@ -53,7 +53,7 @@ export function Messages({ onOpen, store }: { onOpen: (o: Open) => void; store: 
       {error ? <Text style={[s.small, s.pad, { color: t.danger }]}>{error}</Text> : null}
       <FlatList
         data={threads}
-        keyExtractor={th => `${th.number}-${th.store}`}
+        keyExtractor={th => th.number}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { setLoading(true); refresh(); }} />}
         ListEmptyComponent={<Empty text="No texts yet." />}
         renderItem={({ item: th }) => (
@@ -94,13 +94,13 @@ export function Conversation({ open, storeId, onBack, onCall }: {
 
   const refresh = useCallback(async () => {
     try {
-      const r = await api<{ name: string; texts: Sms[] }>(path + (open.store ? `?store=${open.store}` : ''));
+      const r = await api<{ name: string; texts: Sms[] }>(path);
       setTexts(r.texts);
       setName(r.name || open.name);
     } catch (e: any) {
       setError(e.message);
     }
-  }, [path, open.store, open.name]);
+  }, [path, open.name]);
   usePoll(refresh, 5000);
 
   const send = async () => {

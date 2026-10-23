@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Call, CallInvite, Voice } from '@twilio/voice-react-native-sdk';
-import { api, finishSignIn, forget, helpers, load, Me, siteAddress, SignedOut } from './src/api';
+import { api, forget, helpers, load, Me, pretty, signIn, siteAddress, SignedOut } from './src/api';
 import { dial, register, unregister, voice } from './src/calling';
 import { Calls } from './src/Calls';
 import { Caller, InCall, Ringing } from './src/InCall';
@@ -23,6 +23,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [signInError, setSignInError] = useState('');
+  const [session, setSession] = useState(0); // a new sign-in, even over an old one
   const [me, setMe] = useState<Me | null>(null);
   const [storeId, setStoreId] = useState<number>();
   const [tab, setTab] = useState<Tab>('calls');
@@ -45,31 +46,39 @@ export default function App() {
     }
   }, [signedOut]);
 
-  // saved sign-in, and the link Chrome hands back after signing in
+  // a QR sign-in: scanned in the app, or opened by pointing the phone's camera at it (a techresq-phone:// link)
+  const openLink = useCallback(async (url: string) => {
+    if (!url.startsWith('techresq-phone://signin')) {
+      return;
+    }
+    try {
+      await unregister(me); // signing in again, maybe as someone else
+      await signIn(url);
+      setSignInError('');
+      setMe(null);
+      setSession(n => n + 1);
+      setSignedIn(true);
+    } catch (e: any) {
+      setSignInError(e.message);
+    }
+  }, [me]);
+
   useEffect(() => {
-    const onLink = async ({ url }: { url: string }) => {
-      if (!url.startsWith('techresq-phone://signin')) {
-        return;
-      }
-      try {
-        await finishSignIn(url);
-        setSignInError('');
-        setSignedIn(true);
-      } catch (e: any) {
-        setSignInError(e.message);
-      }
-    };
     load().then(async ok => {
       setSignedIn(ok);
       setReady(true);
       const url = await Linking.getInitialURL();
       if (url) {
-        onLink({ url });
+        openLink(url);
       }
     });
-    const sub = Linking.addEventListener('url', onLink);
-    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => openLink(url));
+    return () => sub.remove();
+  }, [openLink]);
 
   // once signed in: who we are, ring this phone, and text alerts
   useEffect(() => {
@@ -87,7 +96,7 @@ export default function App() {
         await api('/phone/api/push-token/', { push_token: push });
       }
     })().catch(failed);
-  }, [signedIn, failed]);
+  }, [signedIn, session, failed]);
 
   // calls: one ringing or in progress when the app opens (e.g. answered from the notification), and new ones
   useEffect(() => {
@@ -150,7 +159,7 @@ export default function App() {
   if (!ready) {
     screen = null;
   } else if (!signedIn) {
-    screen = <SignIn error={signInError} />;
+    screen = <SignIn error={signInError} onScanned={openLink} />;
   } else if (call) {
     screen = <InCall call={call.call} caller={call.caller} />;
   } else if (invite) {
@@ -162,14 +171,14 @@ export default function App() {
     screen = (
       <View style={s.fill}>
         {tab === 'calls' ? <Calls onCall={startCall} store={sub} /> : null}
-        {tab === 'messages' ? <Messages onOpen={setOpen} store={sub} /> : null}
+        {tab === 'messages' ? <Messages onOpen={setOpen} store={sub.replace('Calling', 'Texting')} /> : null}
         {tab === 'settings' ? (
           <View style={s.fill}>
             <Header title="Settings" sub={me?.name} />
             <View style={[s.pad, { gap: 12 }]}>
               <Text style={[s.h2, { color: t.ink }]}>Call and text from</Text>
               {me?.stores.length ? me.stores.map(x => (
-                <Button key={x.id} title={`${x.name}  ${x.number}`} kind={x.id === storeId ? 'brand' : 'plain'} onPress={() => pickStore(x.id)} />
+                <Button key={x.id} title={`${x.name}  ${pretty(x.number)}`} kind={x.id === storeId ? 'brand' : 'plain'} onPress={() => pickStore(x.id)} />
               )) : <Text style={[s.body, { color: t.muted }]}>Your store has no Twilio number yet. A manager adds it in the shop system: Settings → your store.</Text>}
               <Text style={[s.small, { color: t.muted }]}>Signed in to {siteAddress()}</Text>
               <Button title="Sign out" kind="plain" onPress={() => api('/phone/api/signout/', {}).catch(() => {}).finally(signedOut)} />

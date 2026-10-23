@@ -13,7 +13,7 @@ No ticket screens.
 | Several calls | Each call is independent; Twilio has no line limit. A busy phone sees the next call like call waiting. |
 | Caller ID out | The store's Twilio number. Personal numbers are never shown. |
 | Texts | One inbox per store number. Status texts the shop system already sends come from the same store number, so they sit in the same conversation. |
-| Sign-in | The app opens the shop system's own Google sign-in in Chrome (Google blocks sign-in inside apps' web views), then the browser hands a one-time code back to the app (PKCE). Same rules as the website: company Google account, active staff only. "Sign out everywhere" signs the app out too. |
+| Sign-in | A QR code on the shop system's Settings > My account > Phone app, like 3CX. It holds the site address and a one-time code (5 minutes, works once); the app swaps it for its own token. Scan it in the app (Google's built-in scanner) or with the phone's camera. "Sign out on all devices" deletes the person's app sign-ins, so their phones stop ringing at once. |
 | App stack | React Native (bare, no Expo) + Twilio's official `@twilio/voice-react-native-sdk` + Firebase Cloud Messaging. One codebase so iPhone is mostly Apple setup later. |
 | First release | Android, installed by APK (sideloading). Play Store later. |
 
@@ -24,7 +24,7 @@ No ticket screens.
 - Twilio webhooks: `/phone/voice/incoming/`, `/phone/voice/outgoing/` (TwiML App), `/phone/voice/dial-done/`,
   `/phone/voice/answered/`, `/phone/voice/voicemail/`; `/sms/incoming/` now notes which store number was texted.
 - App API under `/phone/api/` with a bearer token: sign-in, me (+ Twilio voice token), push token, lookup, threads, send,
-  calls, voicemail audio.
+  calls, voicemail audio. Settings > Phone app (`settings_pages.phone_app`) shows the QR and the person's phones.
 - Push for texts and voicemails via FCM HTTP v1. Calls ring through Twilio's own push.
 
 **App (this repo)**

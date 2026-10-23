@@ -58,20 +58,31 @@ The APK lands in `android\app\build\outputs\apk\release\app-release.apk`.
 ## Installing on a phone (sideloading)
 1. Copy `app-release.apk` to the phone (USB, Google Drive, email to yourself).
 2. Open it. Android asks to allow installing from that app (Files / Drive / Gmail): allow it, then Install.
-3. Open **Tech ResQ Phone**, allow the microphone and notifications, enter the shop system's address, sign in with
-   Google. Done: the phone now rings for the store's calls.
-4. Recommended: Settings → Apps → Tech ResQ Phone → Battery → **Unrestricted**, so Android never delays a ringing call.
+3. Open **Tech ResQ Phone** and allow the microphone and notifications.
+4. On a computer, sign in to the shop system → Settings → **Phone app** → **Show QR code**. In the app tap
+   **Scan QR code** (or point the phone's camera at it). Done: the phone now rings for that person's store.
+5. Recommended: Settings → Apps → Tech ResQ Phone → Battery → **Unrestricted**, so Android never delays a ringing call.
 
 Updating: install the newer APK over the old one. It keeps the sign-in. Every APK must be built with the same signing
 key (see below), or Android refuses the update.
+
+## Testing on this PC (Android emulator)
+1. Start the shop system: `start.bat` in the POS Takeover folder (keep it open).
+2. Start the emulator (Android Studio → Device Manager → ▶) and install the APK:
+   `adb install -r android\app\build\outputs\apk\release\app-release.apk`
+3. Run `phone-demo.bat` in the POS Takeover folder. It gives the local stores test numbers (555-01xx), adds sample calls
+   and texts, and signs the emulator in as `demo` (`phone-demo.bat tech` for the tech login). Same as scanning the QR,
+   but with `http://10.0.2.2:8000`, which is how the emulator reaches this PC.
+4. Nothing really goes out locally (no Twilio keys on this PC): a sent text shows "not sent".
 
 ## How it works
 - **Incoming call** → Twilio asks the shop system → it rings every signed-in phone at that store (plus staff who see every
   store) with the customer's name → first to answer takes it → nobody in 25s → voicemail, listed under Calls.
 - **Outgoing call** → the app asks Twilio → Twilio asks the shop system → it dials the customer from the store's number.
 - **Texts** → the store's inbox under Messages, the customer's ticket Activity, and a notification on the store's phones.
-- **Sign-in** → Chrome opens the shop system's own Google sign-in (Google blocks sign-in inside apps), then hands the
-  app a one-time code. "Sign out everywhere" in the shop system signs the app out too.
+- **Sign-in** → the QR on Settings → Phone app holds the shop system's address and a one-time code (5 minutes, works
+  once). The app swaps it for its own sign-in. **Sign out on all devices** (or a manager's "Sign out everywhere" on a
+  staff member) signs out the website and every phone, and those phones stop ringing at once.
 
 ## Known limits (v1)
 - Signing: release APKs use the template's debug key (`android/app/debug.keystore`). Fine for sideloading; make a real
