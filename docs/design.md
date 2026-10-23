@@ -1,4 +1,4 @@
-# Tech ResQ Phone — design
+# Lifeline — design
 
 An Android app (iPhone later) that turns staff's own phones into the store's business line: calls in and out, texts in
 and out, on the store's Twilio number. Every number is matched to a customer in the shop system and shown by name.

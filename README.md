@@ -1,5 +1,6 @@
-# Tech ResQ Phone
+# Lifeline
 
+Tech ResQ's phone app. 
 The store's business line on staff's own phones: calls and texts in and out on each store's Twilio number, with every
 number matched to a customer in the shop system. Design: [docs/design.md](docs/design.md).
 
@@ -58,10 +59,10 @@ The APK lands in `android\app\build\outputs\apk\release\app-release.apk`.
 ## Installing on a phone (sideloading)
 1. Copy `app-release.apk` to the phone (USB, Google Drive, email to yourself).
 2. Open it. Android asks to allow installing from that app (Files / Drive / Gmail): allow it, then Install.
-3. Open **Tech ResQ Phone** and allow the microphone and notifications.
+3. Open **Lifeline** and allow the microphone and notifications.
 4. On a computer, sign in to the shop system → Settings → **Phone app** → **Show QR code**. In the app tap
    **Scan QR code** (or point the phone's camera at it). Done: the phone now rings for that person's store.
-5. Recommended: Settings → Apps → Tech ResQ Phone → Battery → **Unrestricted**, so Android never delays a ringing call.
+5. Recommended: Settings → Apps → Lifeline → Battery → **Unrestricted**, so Android never delays a ringing call.
 
 Updating: install the newer APK over the old one. It keeps the sign-in. Every APK must be built with the same signing
 key (see below), or Android refuses the update.

@@ -76,7 +76,7 @@ export async function signIn(link: string) {
   const address = param('site');
   const code = param('code');
   if (!link.startsWith('techresq-phone://signin') || !/^https?:\/\//.test(address) || !code) {
-    throw new Error("That isn't a Tech ResQ Phone sign-in code. Use the one on Settings > Phone app in the shop system.");
+    throw new Error("That isn't a Lifeline sign-in code. Use the one on Settings > Phone app in the shop system.");
   }
   const r = await fetch(`${address}/phone/api/signin/`, {
     method: 'POST',

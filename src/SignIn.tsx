@@ -22,7 +22,7 @@ export function SignIn({ error, onScanned }: { error: string; onScanned: (link: 
 
   return (
     <View style={[s.fill, s.pad, { justifyContent: 'center', gap: 16, backgroundColor: t.bg }]}>
-      <Text style={[s.h1, { color: t.ink }]}>Tech ResQ Phone</Text>
+      <Text style={[s.h1, { color: t.ink }]}>Lifeline</Text>
       <Text style={[s.body, { color: t.muted }]}>
         On a computer, open the shop system and go to Settings → Phone app → Show QR code. Then scan it here.
       </Text>

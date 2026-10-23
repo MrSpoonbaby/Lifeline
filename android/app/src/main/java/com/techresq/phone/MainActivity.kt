@@ -14,7 +14,7 @@ class MainActivity : ReactActivity() {
   // Twilio: asks for the microphone/notification permissions and handles answering from the call notification
   private val voiceActivityProxy = VoiceActivityProxy(this) { permission ->
     if (permission == Manifest.permission.RECORD_AUDIO || permission == Manifest.permission.POST_NOTIFICATIONS) {
-      Toast.makeText(this, "Calls need the microphone and notifications. Allow them in Settings > Apps > Tech ResQ Phone.",
+      Toast.makeText(this, "Calls need the microphone and notifications. Allow them in Settings > Apps > Lifeline.",
         Toast.LENGTH_LONG).show()
     }
   }

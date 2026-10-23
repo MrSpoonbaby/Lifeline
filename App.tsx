@@ -1,4 +1,4 @@
-/** Tech ResQ Phone: the store's business line on staff phones. See docs/design.md. */
+/** Lifeline: the store's business line on staff phones. See docs/design.md. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, StatusBar, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
