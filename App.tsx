@@ -1,35 +1,56 @@
 /** Tech ResQ Phone: the store's business line on staff phones. See docs/design.md. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, StatusBar, Text, View } from 'react-native';
+import { Alert, Linking, StatusBar, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Call, CallInvite, Voice } from '@twilio/voice-react-native-sdk';
-import { api, forget, helpers, load, Me, pretty, signIn, siteAddress, SignedOut } from './src/api';
+import { api, CallRow, forget, helpers, load, Me, signIn, SignedOut } from './src/api';
 import { dial, register, unregister, voice } from './src/calling';
 import { Calls } from './src/Calls';
-import { Caller, InCall, Ringing } from './src/InCall';
+import { DialPad } from './src/Keypad';
+import { CallLike, Caller, InCall, InviteLike, Ringing } from './src/InCall';
+import { ringIn, textIn, voicemailIn } from './src/simulator';
 import { Conversation, Messages, Open } from './src/Messages';
 import { SignIn } from './src/SignIn';
-import { s, useTheme } from './src/theme';
-import { Button, Header } from './src/ui';
+import { KeypadIcon, MessagesIcon, RecentsIcon, VoicemailIcon } from './src/icons';
+import { Settings } from './src/Settings';
+import { StoreContext } from './src/stores';
+import { s, TabKey, ThemeProvider, usePrefs, useTheme } from './src/theme';
+import { Backdrop, Button, Link, TabBar, TabItem, Text } from './src/ui';
+import { TopBar } from './src/TopBar';
+import { Voicemail } from './src/Voicemail';
 
-type Tab = 'calls' | 'messages' | 'settings';
+type Tab = TabKey | 'settings'; // Settings is a screen from the profile menu, not in the tab bar
 
 const callerOf = (params: Record<string, string>, from: string): Caller => ({
   number: from, name: params.callerName ?? '', store: params.store ?? '',
 });
 
-export default function App() {
+export default function Root() {
+  return <ThemeProvider><App /></ThemeProvider>;
+}
+
+function App() {
   const t = useTheme();
+  const prefs = usePrefs();
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [signInError, setSignInError] = useState('');
   const [session, setSession] = useState(0); // a new sign-in, even over an old one
   const [me, setMe] = useState<Me | null>(null);
   const [storeId, setStoreId] = useState<number>();
-  const [tab, setTab] = useState<Tab>('calls');
+  const [chosenTab, setTab] = useState<Tab | null>(null);
+  const [lastTab, setLastTab] = useState<TabKey | null>(null); // where Settings' Back goes
+  const tab = chosenTab ?? prefs.tabs[0]; // opens on the first tab in Settings' order
+  const openSettings = () => {
+    if (tab !== 'settings') {
+      setLastTab(tab);
+    }
+    setTab('settings');
+  };
   const [open, setOpen] = useState<Open | null>(null);
-  const [invite, setInvite] = useState<{ invite: CallInvite; caller: Caller } | null>(null);
-  const [call, setCall] = useState<{ call: Call; caller: Caller } | null>(null);
+  const [invite, setInvite] = useState<{ invite: InviteLike; caller: Caller } | null>(null);
+  const [call, setCall] = useState<{ call: CallLike; caller: Caller } | null>(null);
+  const [newVoicemail, setNewVoicemail] = useState(0);
 
   const signedOut = useCallback(async () => {
     await unregister(me);
@@ -98,23 +119,25 @@ export default function App() {
     })().catch(failed);
   }, [signedIn, session, failed]);
 
+  const watchCall = useCallback((c: CallLike, caller: Caller) => {
+    setCall({ call: c, caller });
+    c.on(Call.Event.Disconnected, () => setCall(null));
+    c.on(Call.Event.ConnectFailure, (err: any) => {
+      setCall(null);
+      Alert.alert("Call didn't connect", String(err?.message || err));
+    });
+  }, []);
+
+  const watchInvite = useCallback((inv: InviteLike) => {
+    const caller = callerOf(inv.getCustomParameters(), inv.getFrom());
+    setInvite({ invite: inv, caller });
+    inv.on(CallInvite.Event.Accepted, (c: CallLike) => { setInvite(null); watchCall(c, caller); });
+    inv.on(CallInvite.Event.Rejected, () => setInvite(null));
+    inv.on(CallInvite.Event.Cancelled, () => setInvite(null));
+  }, [watchCall]);
+
   // calls: one ringing or in progress when the app opens (e.g. answered from the notification), and new ones
   useEffect(() => {
-    const watchInvite = (inv: CallInvite) => {
-      const caller = callerOf(inv.getCustomParameters(), inv.getFrom());
-      setInvite({ invite: inv, caller });
-      inv.on(CallInvite.Event.Accepted, (c: Call) => { setInvite(null); watchCall(c, caller); });
-      inv.on(CallInvite.Event.Rejected, () => setInvite(null));
-      inv.on(CallInvite.Event.Cancelled, () => setInvite(null));
-    };
-    const watchCall = (c: Call, caller: Caller) => {
-      setCall({ call: c, caller });
-      c.on(Call.Event.Disconnected, () => setCall(null));
-      c.on(Call.Event.ConnectFailure, (err: any) => {
-        setCall(null);
-        Alert.alert("Call didn't connect", String(err?.message || err));
-      });
-    };
     voice.on(Voice.Event.CallInvite, watchInvite);
     voice.getCalls().then(calls => {
       const c = [...calls.values()][0];
@@ -131,20 +154,35 @@ export default function App() {
     return () => {
       voice.off(Voice.Event.CallInvite, watchInvite);
     };
+  }, [watchCall, watchInvite]);
+
+  // the badge on the Voicemail tab
+  const countVoicemail = useCallback(() => {
+    api<{ calls: CallRow[] }>('/phone/api/calls/')
+      .then(r => setNewVoicemail(r.calls.filter(c => c.voicemail && !c.heard).length), () => {});
   }, []);
+  useEffect(() => {
+    if (!me) {
+      return;
+    }
+    countVoicemail();
+    const timer = setInterval(countVoicemail, 30000);
+    return () => clearInterval(timer);
+  }, [me, countVoicemail]);
 
   const store = me?.stores.find(x => x.id === storeId);
+  const away = Boolean(me?.out_of_store);
+
+  // Out of store: the shop system stops ringing this person's phones and alerting them
+  const setAway = (out: boolean) => {
+    setMe(m => (m ? { ...m, out_of_store: out } : m));
+    api<{ out_of_store: boolean }>('/phone/api/status/', { out_of_store: out })
+      .then(r => setMe(m => (m ? { ...m, out_of_store: r.out_of_store } : m)), failed);
+  };
 
   const startCall = async (number: string, name: string) => {
     try {
-      const c = await dial(number, storeId, name);
-      const caller = { number, name, store: store?.name ?? '' };
-      setCall({ call: c, caller });
-      c.on(Call.Event.Disconnected, () => setCall(null));
-      c.on(Call.Event.ConnectFailure, (err: any) => {
-        setCall(null);
-        Alert.alert("Call didn't connect", String(err?.message || err));
-      });
+      watchCall(await dial(number, storeId, name), { number, name, store: store?.name ?? '' });
     } catch (e) {
       failed(e);
     }
@@ -167,42 +205,65 @@ export default function App() {
   } else if (open) {
     screen = <Conversation open={open} storeId={storeId} onBack={() => setOpen(null)} onCall={startCall} />;
   } else {
-    const sub = store ? `Calling from ${store.name}` : me ? 'No store phone number set up yet' : '';
     screen = (
       <View style={s.fill}>
-        {tab === 'calls' ? <Calls onCall={startCall} store={sub} /> : null}
-        {tab === 'messages' ? <Messages onOpen={setOpen} store={sub.replace('Calling', 'Texting')} /> : null}
-        {tab === 'settings' ? (
-          <View style={s.fill}>
-            <Header title="Settings" sub={me?.name} />
-            <View style={[s.pad, { gap: 12 }]}>
-              <Text style={[s.h2, { color: t.ink }]}>Call and text from</Text>
-              {me?.stores.length ? me.stores.map(x => (
-                <Button key={x.id} title={`${x.name}  ${pretty(x.number)}`} kind={x.id === storeId ? 'brand' : 'plain'} onPress={() => pickStore(x.id)} />
-              )) : <Text style={[s.body, { color: t.muted }]}>Your store has no Twilio number yet. A manager adds it in the shop system: Settings → your store.</Text>}
-              <Text style={[s.small, { color: t.muted }]}>Signed in to {siteAddress()}</Text>
-              <Button title="Sign out" kind="plain" onPress={() => api('/phone/api/signout/', {}).catch(() => {}).finally(signedOut)} />
-            </View>
+        {me ? <TopBar me={me} away={away} onAway={setAway} onSettings={openSettings} /> : null}
+        {away ? (
+          <View style={[s.row, { gap: 10, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: t.dark ? '#3a2a05' : '#fff4d6' }]}>
+            <Text style={[s.small, s.fill, { color: t.dark ? '#ffd98a' : '#5c4100' }]}>
+              Out of store: calls don't ring this phone, and texts and voicemail arrive without alerts.
+            </Text>
+            <Link title="I'm back" onPress={() => setAway(false)} />
           </View>
         ) : null}
-        <View style={[s.row, { borderTopWidth: 1, borderColor: t.line, backgroundColor: t.card }]}>
-          {(['calls', 'messages', 'settings'] as Tab[]).map(x => (
-            <Pressable key={x} accessibilityRole="tab" accessibilityState={{ selected: tab === x }} onPress={() => setTab(x)}
-              style={[s.fill, { paddingVertical: 14, alignItems: 'center' }]}>
-              <Text style={[s.body, { color: tab === x ? t.brand : t.muted, fontWeight: tab === x ? '700' : '500' }]}>
-                {x[0].toUpperCase() + x.slice(1)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {!store && me ? (
+          <Text style={[s.small, { color: t.danger, paddingHorizontal: 16, paddingVertical: 8 }]}>
+            Your store has no Twilio number yet. A manager adds it in the shop system: Settings, then your store.
+          </Text>
+        ) : null}
+        {tab === 'keypad' ? <DialPad onCall={startCall} /> : null}
+        {tab === 'calls' ? <Calls onCall={startCall} /> : null}
+        {tab === 'messages' ? <Messages onOpen={setOpen} /> : null}
+        {tab === 'voicemail' ? <Voicemail onCall={startCall} onSeen={countVoicemail} /> : null}
+        {tab === 'settings' ? (
+          <Settings me={me} away={away} onAway={setAway} tabLabels={TAB_LABELS} onBack={() => setTab(lastTab ?? prefs.tabs[0])}
+            onSignOut={() => api('/phone/api/signout/', {}).catch(() => {}).finally(signedOut)}
+            simulator={me?.simulated ? (
+              <View style={{ gap: 12, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: t.line, borderStyle: 'dashed' }}>
+                <Text style={[s.h2, { color: t.ink }]}>Simulator</Text>
+                <Text style={[s.small, { color: t.muted }]}>
+                  The shop system is running with fake Twilio keys (local testing). Calls are acted out in the app and
+                  texts don't leave the PC. Everything still shows up in Calls, Voicemail and Messages.
+                </Text>
+                <Button title="Simulate an incoming call" onPress={() => ringIn(storeId).then(inv => (inv ? watchInvite(inv)
+                  : Alert.alert('Out of store', "This phone wouldn't ring: you're marked Out of store. The call rings the others at the store, or goes to voicemail.")), failed)} />
+                <Button title="Simulate an incoming text" kind="plain"
+                  onPress={() => textIn(storeId).then(r => Alert.alert('Text received', `From ${r.name || r.number}. See Messages.`), failed)} />
+                <Button title="Simulate a voicemail" kind="plain"
+                  onPress={() => voicemailIn(storeId).then(() => { countVoicemail(); setTab('voicemail'); }, failed)} />
+              </View>
+            ) : null} />
+        ) : null}
+        <TabBar tabs={prefs.tabs.map(key => ({ ...TABS[key], badge: key === 'voicemail' ? newVoicemail : 0 }))} active={tab} onPress={setTab} />
       </View>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={t.bg === '#f8f8f8' ? 'dark-content' : 'light-content'} backgroundColor={t.card} />
-      <SafeAreaView style={[s.fill, { backgroundColor: t.bg }]}>{screen}</SafeAreaView>
+      <StoreContext.Provider value={{ stores: me?.stores ?? [], current: store, pick: pickStore }}>
+        <StatusBar barStyle={t.dark ? 'light-content' : 'dark-content'} backgroundColor={t.bg === 'transparent' ? t.plainBg : t.bg} />
+        <Backdrop />
+        <SafeAreaView style={[s.fill, { backgroundColor: t.bg }]}>{screen}</SafeAreaView>
+      </StoreContext.Provider>
     </SafeAreaProvider>
   );
 }
+
+const TABS: Record<TabKey, TabItem<Tab>> = {
+  keypad: { key: 'keypad', label: 'Keypad', icon: KeypadIcon },
+  calls: { key: 'calls', label: 'Recents', icon: RecentsIcon },
+  voicemail: { key: 'voicemail', label: 'Voicemail', icon: VoicemailIcon },
+  messages: { key: 'messages', label: 'Messages', icon: MessagesIcon },
+};
+const TAB_LABELS = Object.fromEntries(Object.values(TABS).map(x => [x.key, x.label])) as Record<TabKey, string>;

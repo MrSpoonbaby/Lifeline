@@ -1,22 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Linking, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
-import { api, CallRow, pretty, siteAddress, when } from './api';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { api, CallRow, pretty, when } from './api';
 import { s, useTheme } from './theme';
-import { Button, Empty, Header, Link } from './ui';
+import { Empty, Header, Text } from './ui';
 
 const LABEL: Record<string, string> = {
   completed: '', answered: '', voicemail: 'Voicemail', 'no-answer': 'Missed', busy: 'Missed', canceled: 'Missed', failed: 'Failed', ringing: '',
 };
 
-/** Recent calls for the store, and a number pad. */
-export function Calls({ onCall, store }: { onCall: (number: string, name: string) => void; store: string }) {
+/** Recent calls for the store. Tap one to call back. */
+export function Calls({ onCall }: { onCall: (number: string, name: string) => void }) {
   const t = useTheme();
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [dialing, setDialing] = useState(false);
-  const [number, setNumber] = useState('');
-  const [name, setName] = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -35,39 +32,12 @@ export function Calls({ onCall, store }: { onCall: (number: string, name: string
     return () => clearInterval(timer);
   }, [refresh]);
 
-  useEffect(() => {
-    // the customer's name as soon as the number is complete
-    setName('');
-    if (number.replace(/\D/g, '').length < 10) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      api<{ name: string }>(`/phone/api/lookup/?number=${encodeURIComponent(number)}`).then(r => setName(r.name), () => {});
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [number]);
-
   return (
     <View style={s.fill}>
-      <Header title="Calls" sub={store} right={<Link title={dialing ? 'Close' : 'Dial'} onPress={() => setDialing(!dialing)} />} />
-      {dialing ? (
-        <View style={[s.pad, { gap: 10, backgroundColor: t.card, borderBottomWidth: 1, borderColor: t.line }]}>
-          <TextInput
-            value={number}
-            onChangeText={setNumber}
-            placeholder="Phone number"
-            placeholderTextColor={t.muted}
-            keyboardType="phone-pad"
-            autoFocus
-            style={[s.input, { color: t.ink, borderColor: t.line, fontSize: 22 }]}
-          />
-          <Text style={[s.body, { color: name ? t.ink : t.muted }]}>{name || 'Not a customer yet'}</Text>
-          <Button title="Call" disabled={number.replace(/\D/g, '').length < 10}
-            onPress={() => { onCall(number, name); setDialing(false); setNumber(''); }} />
-        </View>
-      ) : null}
+      <Header title="Recents" />
       {error ? <Text style={[s.small, s.pad, { color: t.danger }]}>{error}</Text> : null}
       <FlatList
+        contentContainerStyle={s.list}
         data={calls}
         keyExtractor={c => String(c.id)}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
@@ -85,7 +55,6 @@ export function Calls({ onCall, store }: { onCall: (number: string, name: string
                 <Text style={[s.h2, { color: missed ? t.danger : t.ink }]} numberOfLines={1}>{c.name || pretty(c.number)}</Text>
                 <Text style={[s.small, { color: t.muted }]} numberOfLines={1}>{detail}</Text>
               </View>
-              {c.voicemail ? <Link title="Play" onPress={() => Linking.openURL(siteAddress() + c.voicemail)} /> : null}
               <Text style={[s.small, { color: t.muted }]}>{when(c.at)}</Text>
             </Pressable>
           );

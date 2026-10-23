@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, FlatList, KeyboardAvoidingView, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { AppState, FlatList, KeyboardAvoidingView, Pressable, RefreshControl, View } from 'react-native';
 import { api, pretty, Text as Sms, Thread, when } from './api';
 import { s, useTheme } from './theme';
-import { Button, Empty, Header, Link } from './ui';
+import { Button, Empty, Header, Link, Text, TextInput } from './ui';
 
 /** Runs `fn` now, every `ms` while the app is on screen, and when it comes back to the front. */
 function usePoll(fn: () => void, ms: number) {
@@ -20,7 +20,7 @@ function usePoll(fn: () => void, ms: number) {
 export type Open = { number: string; name: string; store: number | null };
 
 /** Conversations, newest first. */
-export function Messages({ onOpen, store }: { onOpen: (o: Open) => void; store: string }) {
+export function Messages({ onOpen }: { onOpen: (o: Open) => void }) {
   const t = useTheme();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,9 +41,9 @@ export function Messages({ onOpen, store }: { onOpen: (o: Open) => void; store: 
 
   return (
     <View style={s.fill}>
-      <Header title="Messages" sub={store} right={<Link title={composing ? 'Close' : 'New'} onPress={() => setComposing(!composing)} />} />
+      <Header title="Messages" right={<Link title={composing ? 'Close' : 'New'} onPress={() => setComposing(!composing)} />} />
       {composing ? (
-        <View style={[s.pad, s.row, { gap: 10, backgroundColor: t.card, borderBottomWidth: 1, borderColor: t.line }]}>
+        <View style={[s.pad, s.row, { gap: 10, margin: 12, marginBottom: 0, borderRadius: 18, backgroundColor: t.card, borderWidth: 1, borderColor: t.line }]}>
           <TextInput value={number} onChangeText={setNumber} placeholder="Phone number" placeholderTextColor={t.muted}
             keyboardType="phone-pad" autoFocus style={[s.input, s.fill, { color: t.ink, borderColor: t.line }]} />
           <Button title="Text" disabled={number.replace(/\D/g, '').length < 10}
@@ -52,6 +52,7 @@ export function Messages({ onOpen, store }: { onOpen: (o: Open) => void; store: 
       ) : null}
       {error ? <Text style={[s.small, s.pad, { color: t.danger }]}>{error}</Text> : null}
       <FlatList
+        contentContainerStyle={s.list}
         data={threads}
         keyExtractor={th => th.number}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { setLoading(true); refresh(); }} />}
@@ -128,9 +129,9 @@ export function Conversation({ open, storeId, onBack, onCall }: {
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item: x }) => (
           <View style={{ alignSelf: x.incoming ? 'flex-start' : 'flex-end', maxWidth: '82%' }}>
-            <View style={{ backgroundColor: x.incoming ? t.card : t.brand, borderRadius: 14, padding: 10,
-              borderWidth: x.incoming ? 1 : 0, borderColor: t.line }}>
-              <Text style={[s.body, { color: x.incoming ? t.ink : t.onBrand }]}>{x.body}</Text>
+            <View style={{ backgroundColor: x.incoming ? t.bubbleIn : t.bubbleOut, borderRadius: 18,
+              paddingHorizontal: 12, paddingVertical: 8, borderWidth: x.incoming ? 1 : 0, borderColor: t.line }}>
+              <Text style={[s.body, { color: x.incoming ? t.onBubbleIn : t.onBubbleOut, fontSize: 16 }]}>{x.body}</Text>
             </View>
             <Text style={[s.small, { color: x.ok ? t.muted : t.danger, alignSelf: x.incoming ? 'flex-start' : 'flex-end' }]}>
               {when(x.at)}{x.by ? ` · ${x.by}` : ''}{x.ok ? '' : ' · not sent'}
@@ -139,7 +140,7 @@ export function Conversation({ open, storeId, onBack, onCall }: {
         )}
       />
       {error ? <Text style={[s.small, { color: t.danger, paddingHorizontal: 12 }]}>{error}</Text> : null}
-      <View style={[s.row, { gap: 8, padding: 10, borderTopWidth: 1, borderColor: t.line, backgroundColor: t.card }]}>
+      <View style={[s.row, { gap: 8, padding: 10, margin: 10, borderRadius: 26, borderWidth: 1, borderColor: t.line, backgroundColor: t.card }]}>
         <TextInput value={body} onChangeText={setBody} placeholder="Text message" placeholderTextColor={t.muted} multiline
           style={[s.input, s.fill, { color: t.ink, borderColor: t.line, maxHeight: 120 }]} />
         <Button title="Send" onPress={send} disabled={sending || !body.trim()} />

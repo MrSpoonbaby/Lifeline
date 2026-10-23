@@ -14,7 +14,8 @@
     "@twilio/voice-react-native-sdk": "1.8.1",
     "react": "19.2.0",
     "react-native": "0.83.6",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-svg": "^15.16.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

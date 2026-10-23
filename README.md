@@ -73,7 +73,11 @@ key (see below), or Android refuses the update.
 3. Run `phone-demo.bat` in the POS Takeover folder. It gives the local stores test numbers (555-01xx), adds sample calls
    and texts, and signs the emulator in as `demo` (`phone-demo.bat tech` for the tech login). Same as scanning the QR,
    but with `http://10.0.2.2:8000`, which is how the emulator reaches this PC.
-4. Nothing really goes out locally (no Twilio keys on this PC): a sent text shows "not sent".
+4. **Simulator:** `start.bat` runs the shop system in local test mode with no real Twilio keys, so it switches to fake ones
+   and the simulator. Texts "send" without leaving the PC, calls are acted out in the app (rings, connects, mute,
+   speaker, keypad, hang up), and Settings → Simulator fakes an incoming call or text from a real customer. Every
+   simulated call and text shows up in Calls and Messages. It never runs in production: the live site doesn't run in
+   that test mode.
 
 ## How it works
 - **Incoming call** → Twilio asks the shop system → it rings every signed-in phone at that store (plus staff who see every

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { helpers } from './api';
 import { s, useTheme } from './theme';
-import { Button } from './ui';
+import { Button, Text } from './ui';
 
 /** Scan the QR from the shop system's Settings > Phone app. It holds the site's address and a one-time code. */
 export function SignIn({ error, onScanned }: { error: string; onScanned: (link: string) => void }) {

@@ -1,15 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { AudioDevice, Call, CallInvite } from '@twilio/voice-react-native-sdk';
+import { View } from 'react-native';
+import { AudioDevice, Call } from '@twilio/voice-react-native-sdk';
 import { voice } from './calling';
 import { pretty } from './api';
 import { s, useTheme } from './theme';
-import { Button } from './ui';
+import { Button, Text } from './ui';
+import { Keypad } from './Keypad';
 
 export type Caller = { number: string; name: string; store: string };
 
+/** What the screens use of a call / ringing call: Twilio's, or the simulator's stand-ins (src/simulator.ts). */
+export interface CallLike {
+  on(event: string, fn: (...args: any[]) => void): unknown;
+  off(event: string, fn: (...args: any[]) => void): unknown;
+  getState(): Call.State;
+  isMuted(): boolean | undefined;
+  mute(mute: boolean): Promise<boolean>;
+  sendDigits(digits: string): Promise<void>;
+  disconnect(): Promise<void>;
+  getInitialConnectedTimestamp(): Date | undefined;
+  getCustomParameters(): Record<string, string>;
+  getFrom(): string | undefined;
+}
+export interface InviteLike {
+  on(event: string, fn: (...args: any[]) => void): unknown;
+  accept(): Promise<unknown>;
+  reject(): Promise<void>;
+  getCustomParameters(): Record<string, string>;
+  getFrom(): string;
+}
+
 /** A call ringing in while the app is open. The lock-screen version is Twilio's own notification. */
-export function Ringing({ invite, caller }: { invite: CallInvite; caller: Caller }) {
+export function Ringing({ invite, caller }: { invite: InviteLike; caller: Caller }) {
   const t = useTheme();
   return (
     <View style={[s.fill, s.pad, { justifyContent: 'space-between', backgroundColor: t.bg }]}>
@@ -20,13 +42,13 @@ export function Ringing({ invite, caller }: { invite: CallInvite; caller: Caller
       </View>
       <View style={[s.row, { gap: 16, marginBottom: 40 }]}>
         <Button title="Decline" kind="danger" style={s.fill} onPress={() => invite.reject()} />
-        <Button title="Answer" style={s.fill} onPress={() => invite.accept()} />
+        <Button title="Answer" kind="call" style={s.fill} onPress={() => invite.accept()} />
       </View>
     </View>
   );
 }
 
-export function InCall({ call, caller }: { call: Call; caller: Caller }) {
+export function InCall({ call, caller }: { call: CallLike; caller: Caller }) {
   const t = useTheme();
   const [state, setState] = useState(call.getState());
   const [muted, setMuted] = useState(Boolean(call.isMuted()));
@@ -75,17 +97,7 @@ export function InCall({ call, caller }: { call: Call; caller: Caller }) {
         <Text style={[s.body, { color: t.muted }]}>{status}{caller.store ? ` · ${caller.store}` : ''}</Text>
         {keypad && digits ? <Text style={[s.h2, { color: t.ink, letterSpacing: 2 }]}>{digits}</Text> : null}
       </View>
-      {keypad ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 }}>
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map(k => (
-            <Pressable key={k} accessibilityRole="button" accessibilityLabel={`Key ${k}`} onPress={() => key(k)}
-              style={({ pressed }) => [{ width: '28%', paddingVertical: 14, borderRadius: 12, alignItems: 'center',
-                backgroundColor: pressed ? t.soft : t.card, borderWidth: 1, borderColor: t.line }]}>
-              <Text style={[s.h1, { color: t.ink }]}>{k}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
+      {keypad ? <View style={{ alignItems: 'center' }}><Keypad onKey={key} /></View> : null}
       <View style={{ gap: 12, marginBottom: 40 }}>
         <View style={[s.row, { gap: 12 }]}>
           <Button title={muted ? 'Unmute' : 'Mute'} kind={muted ? 'brand' : 'plain'} style={s.fill}

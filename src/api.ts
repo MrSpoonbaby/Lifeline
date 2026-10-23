@@ -6,16 +6,28 @@ type Helpers = {
   set(key: string, value: string | null): Promise<void>;
   scanQr(): Promise<string | null>;
   pushToken(): Promise<string | null>;
+  play(url: string): Promise<number>;
+  pause(): Promise<void>;
+  resume(): Promise<void>;
+  seek(ms: number): Promise<void>;
+  stop(): Promise<void>;
+  playback(): Promise<{ position: number; duration: number; playing: boolean } | null>;
+  systemAccent(): Promise<{ light: string; lightSoft: string; dark: string; darkSoft: string } | null>;
+  pickImage(): Promise<string | null>;
+  clearImage(): Promise<void>;
 };
 export const helpers: Helpers = NativeModules.PhoneHelpers;
 
 export type Store = { id: number; name: string; number: string };
-export type Me = { name: string; identity: string; voice_token: string; stores: Store[] };
+export type Me = {
+  name: string; identity: string; voice_token: string; stores: Store[]; simulated: boolean; out_of_store: boolean;
+  initials: string; avatar_url: string;
+};
 export type Text = { id: number; body: string; incoming: boolean; ok: boolean; error: string; at: string; by: string };
 export type Thread = Text & { number: string; name: string; store: number | null; store_name: string };
 export type CallRow = {
   id: number; number: string; name: string; incoming: boolean; status: string; seconds: number;
-  at: string; store_name: string; staff: string; voicemail: string;
+  at: string; store_name: string; staff: string; voicemail: string; heard: boolean;
 };
 
 let site = '';
