@@ -24,7 +24,8 @@ export type Me = {
   initials: string; avatar_url: string;
 };
 export type Text = { id: number; body: string; incoming: boolean; ok: boolean; error: string; at: string; by: string };
-export type Thread = Text & { number: string; name: string; store: number | null; store_name: string };
+/** label: set on numbers that aren't customers' (a supplier...), the same as on the website's Messages */
+export type Thread = Text & { number: string; name: string; store: number | null; store_name: string; label: string };
 export type CallRow = {
   id: number; number: string; name: string; incoming: boolean; status: string; seconds: number;
   at: string; store_name: string; staff: string; voicemail: string; heard: boolean;
