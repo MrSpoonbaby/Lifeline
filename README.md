@@ -4,47 +4,43 @@ Tech ResQ's phone app.
 The store's business line on staff's own phones: calls and texts in and out on each store's Twilio number, with every
 number matched to a customer in the shop system. Design: [docs/design.md](docs/design.md).
 
-The server half lives in the shop system (POS Takeover repo, `shop/phone.py`). This repo is only the app.
+The server half lives in the shop system (TechDeck repo, `shop/phone.py`). This repo is only the app.
 
 ## One-time setup
 
-You need: the Twilio account the shop already uses for texts, a free Firebase project, and the shop system on Render.
+You need: each store's own Twilio account, one free Firebase project (shared by every store), and the shop system on
+Render. Each store's Twilio values go in the shop system under Settings → that store; only Firebase goes in Render.
 
-### 1. A Twilio number per store
-1. Twilio console → Phone Numbers → buy one local number per store (or reuse the one you text from today for one store).
-2. Shop system → Settings → each store → **Twilio number**: enter it, like `+15551234567`.
-3. On each number in Twilio (Phone Numbers → Manage → the number):
-   - **Voice** → "A call comes in" → Webhook → `https://<your-site>/phone/voice/incoming/` (HTTP POST)
-   - **Messaging** → "A message comes in" → Webhook → `https://<your-site>/sms/incoming/` (HTTP POST)
-4. US only: each number must be on your **A2P 10DLC** campaign (Messaging → Regulatory Compliance), or carriers block its texts.
-
-### 2. Twilio pieces for calling from the app
-1. **API key**: Account → API keys & tokens → Create API key (Standard). Note the SID (`SK...`) and secret.
-2. **TwiML App**: Voice → TwiML Apps → Create. Voice request URL: `https://<your-site>/phone/voice/outgoing/` (POST).
-   Note its SID (`AP...`).
-
-### 3. Firebase (makes the phone ring when the app is closed, and text alerts)
+### 1. Firebase (once, for the app: rings the phone when the app is closed, and text alerts)
+One project for all stores: the APK is built with one `google-services.json`, so every phone uses that project.
 1. https://console.firebase.google.com → Add project (Analytics not needed).
 2. Add an **Android app** with package name `com.techresq.phone`. Download `google-services.json` and put it in
    `android/app/` in this repo. (It's not secret, but it's ignored by git; keep a copy somewhere safe.)
-3. Project settings → **Service accounts** → Generate new private key. That JSON file is secret.
+3. Project settings → **Service accounts** → Generate new private key. That JSON file is secret: it goes only in Twilio
+   and Render, never in the app or this repo.
+   "Key creation is not allowed on this service account"? A Google Workspace organization blocks keys by default.
+   Google Cloud console → the organization → IAM: give yourself **Organization Policy Administrator**, then the project →
+   IAM & Admin → Organization Policies → **Disable service account key creation** (and its "managed" twin, if listed) →
+   Manage policy → Override parent's policy → Enforcement **Off**.
 4. Project settings → Cloud Messaging: make sure **Firebase Cloud Messaging API (V1)** is enabled.
-5. Twilio console → Voice → Credentials (Push Credentials) → Create → type **FCM**, paste the *whole* service account
-   JSON as the secret. Note the SID (`CR...`).
+5. Render dashboard → the web service → Environment → add `FIREBASE_SERVICE_ACCOUNT` = the *whole* service account JSON,
+   pasted as one value. (Text and voicemail alerts; calls ring without it.)
 
-### 4. Render (the shop system's settings)
-Render dashboard → the web service → Environment, add:
-
-| Key | Value |
-|---|---|
-| `TWILIO_API_KEY` | `SK...` |
-| `TWILIO_API_SECRET` | the API key's secret |
-| `TWILIO_TWIML_APP_SID` | `AP...` |
-| `TWILIO_PUSH_CREDENTIAL_SID` | `CR...` |
-| `FIREBASE_SERVICE_ACCOUNT` | the whole service account JSON, pasted as one value |
-
-`TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are already there from texting. Then deploy the shop system branch with the
-phone app changes (it adds a database migration).
+### 2. Each store's Twilio account
+Do this in each store's own Twilio console, then enter the values in the shop system → Settings → that store.
+1. **Number**: Phone Numbers → buy a local number (or reuse the one the store texts from). → **Texting number**, like
+   `+15551234567`. On the number (Phone Numbers → Manage → the number):
+   - **Voice** → "A call comes in" → Webhook → `https://<your-site>/phone/voice/incoming/` (HTTP POST)
+   - **Messaging** → "A message comes in" → Webhook → `https://<your-site>/sms/incoming/` (HTTP POST)
+   - US only: the number must be on your **A2P 10DLC** campaign (Messaging → Regulatory Compliance), or carriers block
+     its texts.
+2. **Account SID** and **Auth Token** (console home) → **Twilio Account SID** / **Twilio Auth Token**.
+3. **API key**: Account → API keys & tokens → Create API key (Standard). → **Twilio API key SID** (`SK...`) and
+   **Twilio API key secret** (shown once).
+4. **TwiML App**: Voice → TwiML Apps → Create. Voice request URL: `https://<your-site>/phone/voice/outgoing/` (POST).
+   → **TwiML App SID** (`AP...`).
+5. **Push credential**: Voice → Credentials (Push Credentials) → Create → type **FCM**, paste the *whole* service account
+   JSON from step 1.3 as the secret (the same JSON for every store). → **Push credential SID** (`CR...`).
 
 ## Building the APK (Windows)
 
@@ -68,10 +64,10 @@ Updating: install the newer APK over the old one. It keeps the sign-in. Every AP
 key (see below), or Android refuses the update.
 
 ## Testing on this PC (Android emulator)
-1. Start the shop system: `start.bat` in the POS Takeover folder (keep it open).
+1. Start the shop system: `start.bat` in the TechDeck folder (keep it open).
 2. Start the emulator (Android Studio → Device Manager → ▶) and install the APK:
    `adb install -r android\app\build\outputs\apk\release\app-release.apk`
-3. Run `phone-demo.bat` in the POS Takeover folder. It gives the local stores test numbers (555-01xx), adds sample calls
+3. Run `phone-demo.bat` in the TechDeck folder. It gives the local stores test numbers (555-01xx), adds sample calls
    and texts, and signs the emulator in as `demo` (`phone-demo.bat tech` for the tech login). Same as scanning the QR,
    but with `http://10.0.2.2:8000`, which is how the emulator reaches this PC.
 4. **Simulator:** `start.bat` runs the shop system in local test mode with no real Twilio keys, so it switches to fake ones
