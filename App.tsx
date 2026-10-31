@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, StatusBar, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { Call, CallInvite, Voice } from '@twilio/voice-react-native-sdk';
-import { api, CallRow, forget, helpers, load, Me, signIn, SignedOut } from './src/api';
+import { api, CallRow, forget, helpers, load, Me, pretty, signIn, SignedOut } from './src/api';
 import { dial, register, unregister, voice } from './src/calling';
 import { Calls } from './src/Calls';
 import { DialPad } from './src/Keypad';
@@ -21,8 +21,9 @@ import { Voicemail } from './src/Voicemail';
 
 type Tab = TabKey | 'settings'; // Settings is a screen from the profile menu, not in the tab bar
 
+// for someone who isn't a customer the shop sends their number as callerName, for the lock screen: that's no name to show here
 const callerOf = (params: Record<string, string>, from: string): Caller => ({
-  number: from, name: params.callerName ?? '', store: params.store ?? '',
+  number: from, name: params.callerName === pretty(from) ? '' : params.callerName ?? '', store: params.store ?? '',
 });
 
 export default function Root() {
